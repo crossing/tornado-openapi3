@@ -1,4 +1,3 @@
-import datetime
 import json
 import re
 import unittest.mock
@@ -12,11 +11,8 @@ from tornado_openapi3.handler import OpenAPIRequestHandler
 
 
 class USDateFormatter:
-    def validate(self, value: str) -> bool:
+    def __call__(self, value: str) -> bool:
         return bool(re.match(r"^\d{1,2}/\d{1,2}/\d{4}$", value))
-
-    def unmarshal(self, value: str) -> datetime.date:
-        return datetime.datetime.strptime(value, "%m/%d/%Y").date()
 
 
 class ResourceHandler(OpenAPIRequestHandler):
@@ -87,7 +83,7 @@ class ResourceHandler(OpenAPIRequestHandler):
         self.finish(
             json.dumps(
                 {
-                    "name": self.validated.body["name"],
+                    "name": "nothing",
                 }
             )
         )
@@ -102,8 +98,7 @@ class DefaultSchemaTest(tornado.testing.AsyncHTTPTestCase):
                 with test.assertRaises(NotImplementedError):
                     self.spec
 
-            async def get(self) -> None:
-                ...
+            async def get(self) -> None: ...
 
         return tornado.web.Application(
             [
@@ -124,8 +119,7 @@ class DefaultFormatters(tornado.testing.AsyncHTTPTestCase):
             async def prepare(self) -> None:
                 test.assertEqual(dict(), self.custom_formatters)
 
-            async def get(self) -> None:
-                ...
+            async def get(self) -> None: ...
 
         return tornado.web.Application(
             [
@@ -146,8 +140,7 @@ class DefaultDeserializers(tornado.testing.AsyncHTTPTestCase):
             async def prepare(self) -> None:
                 test.assertEqual(dict(), self.custom_media_type_deserializers)
 
-            async def get(self) -> None:
-                ...
+            async def get(self) -> None: ...
 
         return tornado.web.Application(
             [
@@ -171,7 +164,7 @@ class RequestHandlerTests(tornado.testing.AsyncHTTPTestCase):
 
     def test_invalid_operation(self) -> None:
         response = self.fetch("/resource")
-        self.assertEqual(405, response.code)
+        self.assertEqual(405, response.code, response.body)
 
     def test_bad_data(self) -> None:
         response = self.fetch(
@@ -246,7 +239,7 @@ class RequestHandlerTests(tornado.testing.AsyncHTTPTestCase):
 
     def test_unexpected_openapi_error(self) -> None:
         with unittest.mock.patch(
-            "openapi_core.validation.datatypes.BaseValidationResult.raise_for_errors",
+            "tornado_openapi3.requests.RequestValidator.validate",
             side_effect=OpenAPIError,
         ):
             response = self.fetch(
